@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17
+
+    container_name: entregaai_db
+
+    env_file:
+      - .env
+
+    ports:
+      - '${DB_PORT}:5432'
+
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+
+    restart: always
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  pgdata:

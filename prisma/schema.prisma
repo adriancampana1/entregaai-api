@@ -1,0 +1,118 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum StatusEntregador {
+  ATIVO
+  INATIVO
+}
+
+enum StatusPedido {
+  AGUARDANDO_ROTA
+  EM_ROTA
+  CONCLUIDO
+}
+
+enum StatusCorrida {
+  EM_ANDAMENTO
+  FINALIZADA
+  CANCELADA
+}
+
+enum StatusParada {
+  PENDENTE
+  CONCLUIDA
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  nome  String   @unique
+  senha  String   // Will store hashed password
+  createdAt DateTime @default(now()) @map("criado_em")
+  updatedAt DateTime @updatedAt @map("atualizado_em")
+
+  @@map("admins")
+}
+
+model Entregador {
+  id        Int                @id @default(autoincrement())
+  nome      String
+  telefone  String @unique
+  status    StatusEntregador   @default(ATIVO)
+  corridas  Corrida[] // Relação: Um entregador pode ter muitas corridas.
+
+  createdAt DateTime           @default(now()) @map("criado_em")
+  updatedAt DateTime           @updatedAt @map("atualizado_em")
+
+  @@map("entregadores")
+}
+
+model Pedido {
+  id               Int          @id @default(autoincrement())
+  nomeCliente     String       @map("nome_cliente")
+  crmPedidoId      String       @unique @map("crm_pedido_id")
+  enderecoCompleto String       @map("endereco_completo")
+  latitude         Float       // Coordenada de latitude do endereço
+  longitude        Float       // Coordenada de longitude do endereço
+  tempoMaximoEntrega String @map("tempo_maximo_entrega") // Tempo máximo para entrega, ex: "2025-06-15T01:43:16.239Z"
+
+  statusGeral      StatusPedido @default(AGUARDANDO_ROTA) @map("status_geral")
+
+  paradas          Parada[] // Relação: Um pedido pode estar em várias paradas (em caso de re-entrega, por exemplo).
+
+  createdAt        DateTime     @default(now()) @map("criado_em")
+  updatedAt        DateTime     @updatedAt @map("atualizado_em")
+
+  @@map("pedidos")
+}
+
+model Corrida {
+  id           Int           @id @default(autoincrement())
+  status       StatusCorrida @default(EM_ANDAMENTO)
+
+  // Relação com Entregador (Muitas Corridas para Um Entregador)
+  entregador   Entregador    @relation(fields: [entregadorId], references: [id])
+  entregadorId Int           @map("entregador_id")
+
+  // Relação com Paradas (Uma Corrida tem Muitas Paradas)
+  paradas      Parada[]
+
+  createdAt    DateTime      @default(now()) @map("criado_em")
+  updatedAt    DateTime      @updatedAt @map("atualizado_em")
+
+  @@index([entregadorId]) // Índice para acelerar a busca de corridas por entregador.
+  @@map("corridas")
+}
+
+model Parada {
+  id               Int          @id @default(autoincrement())
+  ordem            Int // Posição na sequência da rota (1, 2, 3...)
+  status           StatusParada @default(PENDENTE)
+  horarioConclusao DateTime?    @map("horario_conclusao") // '?' indica que o campo é opcional/nulo.
+
+  // Relação com Corrida (Muitas Paradas para Uma Corrida)
+  corrida          Corrida      @relation(fields: [corridaId], references: [id])
+  corridaId        Int          @map("corrida_id")
+
+  // Relação com Pedido (Muitas Paradas para Um Pedido)
+  pedido           Pedido       @relation(fields: [pedidoId], references: [id])
+  pedidoId         Int          @map("pedido_id")
+
+  createdAt        DateTime     @default(now()) @map("criado_em")
+  updatedAt        DateTime     @updatedAt @map("atualizado_em")
+
+  // Constraints de unicidade para garantir a integridade dos dados
+  @@unique([corridaId, pedidoId], name: "corrida_pedido_unique") // Um pedido não pode estar 2x na mesma corrida.
+  @@unique([corridaId, ordem], name: "corrida_ordem_unique") // A ordem não pode se repetir na mesma corrida.
+
+  // Índices para performance
+  @@index([corridaId])
+  @@index([pedidoId])
+
+  @@map("paradas")
+}
