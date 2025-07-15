@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RoutesClient } from '@googlemaps/routing';
+import { GoogleAuth } from 'google-auth-library';
 import {
   TspSolverInput,
   TspSolverOutput,
@@ -49,8 +50,24 @@ export class TspSolverService {
   };
 
   constructor() {
+    // Configurar autenticação do Google Cloud se as credenciais estiverem disponíveis
+    let auth: GoogleAuth | undefined = undefined;
+
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      try {
+        const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+        auth = new GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        });
+      } catch (error) {
+        this.logger.warn('Erro ao parsear GOOGLE_SERVICE_ACCOUNT_KEY:', error);
+      }
+    }
+
     this.routesClient = new RoutesClient({
       key: process.env.GOOGLE_MAPS_API_KEY,
+      auth: auth,
     });
   }
 
